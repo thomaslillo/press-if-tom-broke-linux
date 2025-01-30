@@ -4,12 +4,12 @@
 APT = sudo apt-get
 INSTALL = $(APT) install -y
 SNAP = sudo snap install
-FLATPAK = flatpak install -y flathub
+FLATPAK = flatpak install --user -y flathub
 PIP = pip3 install
 OH_MY_ZSH = sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-KBD_SHORTCUT_CMD = 'kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group org.kde.spectacle.desktop --key "Custom Shortcuts" --key "spectacle" "Ctrl+Shift+S,none,Spectacle"'
+KBD_SHORTCUT_CMD = kwriteconfig5 --file $$HOME/.config/kglobalshortcutsrc --group org.kde.spectacle.desktop --key "spectacle" "Ctrl+Shift+S,none,Spectacle"
 
-# Default target (run when you type 'make' without arguments)
+# Default target
 all: update install-dependencies install-programs configure-shortcut
 
 # Update package list and install essential tools
@@ -17,20 +17,21 @@ update:
 	$(APT) update
 	$(INSTALL) curl git wget
 
-# Install dependencies (Flatpak, Snap, spectacle)
+# Install dependencies
 install-dependencies:
-	# Install Flatpak if not already installed
-	if ! command -v flatpak &> /dev/null; then \
+	# Install Flatpak
+	if ! command -v flatpak >/dev/null; then \
 		$(INSTALL) flatpak; \
-		flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo; \
+		sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo; \
 	fi
 
-	# Install Snap if not already installed
-	if ! command -v snap &> /dev/null; then \
+	# Install Snap
+	if ! command -v snap >/dev/null; then \
 		$(INSTALL) snapd; \
+		sudo systemctl enable --now snapd.socket; \
 	fi
 
-	# Install Spectacle (KDE screenshot tool)
+	# Install Spectacle
 	$(INSTALL) spectacle
 
 # Install programs
@@ -38,7 +39,7 @@ install-programs: install-thorium install-steam install-discord install-vscode i
 
 # Install Thorium Browser
 install-thorium:
-	wget https://dl.thorium.rocks/debian/dists/stable/thorium.list -O /etc/apt/sources.list.d/thorium.list
+	sudo wget https://dl.thorium.rocks/debian/dists/stable/thorium.list -O /etc/apt/sources.list.d/thorium.list
 	wget -qO - https://dl.thorium.rocks/debian/thorium.gpg | sudo apt-key add -
 	$(APT) update
 	$(INSTALL) thorium-browser
@@ -59,24 +60,25 @@ install-vscode:
 install-pinta:
 	$(FLATPAK) pinta
 
-# Install oh-my-zsh
+# Install oh-my-zsh and set as default shell
 install-oh-my-zsh:
 	$(INSTALL) zsh
-	$(OH_MY_ZSH)
+	$(OH_MY_ZSH) "" --unattended
+	chsh -s $$(command -v zsh)
+	@exec zsh
 
-# Install Python and pip
+# Install Python
 install-python:
 	$(INSTALL) python3 python3-pip
 
-# Configure keyboard shortcut (Ctrl+Shift+S for PrintScreen)
+# Configure keyboard shortcut
 configure-shortcut:
-	eval $(KBD_SHORTCUT_CMD)
+	$(KBD_SHORTCUT_CMD)
 	qdbus org.kde.kglobalaccel /component/spectacle reconfigure
 
-# Clean up unused packages
+# Clean up
 clean:
 	$(APT) autoremove -y
 	$(APT) autoclean -y
 
-# Phony targets (not actual files)
 .PHONY: all update install-dependencies install-programs install-thorium install-steam install-discord install-vscode install-pinta install-oh-my-zsh install-python configure-shortcut clean
